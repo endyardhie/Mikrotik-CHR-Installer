@@ -2,8 +2,7 @@
 
 Script otomatis untuk menginstal **MikroTik Cloud Hosted Router (CHR)** versi **v6 (Stable)** dan **v7 (Stable)** pada Virtual Private Server (VPS) ber-OS Ubuntu Server.
 
-Script ini dirancang untuk berjalan secara fully-automated (tanpa intervensi manual setelah dijalankan), sangat cocok untuk VPS berbasis cloud (KVM, OpenVZ, Xen, dll) seperti DigitalOcean, Linode, Vultr, Biznet Gio, Hetzner, dan provider lainnya.
-
+Script ini dirancang untuk berjalan secara fully-automated (tanpa intervensi manual setelah dijalankan), sangat cocok untuk VPS yang menggunakan virtualisasi penuh (Full Virtualization) seperti **KVM, Xen (HVM), Hyper-V, atau VMware**
 ---
 
 ## 🚀 Fitur Utama
