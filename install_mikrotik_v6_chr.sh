@@ -14,7 +14,8 @@ fi
 
 # 1. Mendapatkan versi stable v6 terbaru
 echo "[*] Mengecek versi terbaru MikroTik CHR v6 stable..."
-VERSION=$(curl -s https://download.mikrotik.com/routeros/LATEST.6)
+# PERBAIKAN: Menambahkan awk '{print $1}' untuk membuang timestamp
+VERSION=$(curl -s https://download.mikrotik.com/routeros/LATEST.6 | awk '{print $1}')
 if [ -z "$VERSION" ]; then
     echo "[-] Gagal mendapatkan versi dari MikroTik. Set default ke 6.49.17"
     VERSION="6.49.17"
