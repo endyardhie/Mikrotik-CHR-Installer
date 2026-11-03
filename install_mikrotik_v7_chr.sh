@@ -1,6 +1,6 @@
 #!/bin/bash
 # Auto-Installer MikroTik CHR v7 untuk Ubuntu Server VPS
-# Mendukung instalasi otomatis, injeksi IP, deteksi netmask dan gateway.
+# Mendukung instalasi otomatis, injeksi IP, deteksi netmask, gateway, dan disk cerdas via fdisk offset.
 
 echo "================================================="
 echo "  MikroTik CHR v7 Auto Installer (Ubuntu VPS)    "
@@ -14,7 +14,7 @@ fi
 
 # 1. Mendapatkan versi stable v7 terbaru
 echo "[*] Mengecek versi terbaru MikroTik CHR v7 stable..."
-VERSION=$(curl -s https://download.mikrotik.com/routeros/LATEST.7)
+VERSION=$(curl -s https://download.mikrotik.com/routeros/LATEST.7 | awk '{print $1}')
 if [ -z "$VERSION" ]; then
     echo "[-] Gagal mendapatkan versi dari MikroTik. Set default ke 7.15.3"
     VERSION="7.15.3"
@@ -41,20 +41,27 @@ echo "[+] Interface : $INTERFACE"
 echo "[+] IP / CIDR : $IP_CIDR"
 echo "[+] Gateway   : $GATEWAY"
 
-# 3. Deteksi Disk (sda / vda)
+# 3. Deteksi Disk Induk secara Akurat
 echo "[*] Mendeteksi disk instalasi..."
-DISK=$(lsblk -nd -o NAME | grep -E '^vda|^sda' | head -n 1)
-if [ -z "$DISK" ]; then
-    echo "[-] Tidak ada disk sda atau vda yang ditemukan. Keluar."
+ROOT_PART=$(findmnt -n -o SOURCE /)
+if [ -z "$ROOT_PART" ]; then
+    echo "[-] Gagal mendeteksi partisi root. Keluar."
     exit 1
 fi
+
+DISK=$(lsblk -no PKNAME "$ROOT_PART")
+if [ -z "$DISK" ]; then
+    DISK=$(echo "$ROOT_PART" | sed -E 's/[0-9]+$//; s/p$//; s|/dev/||')
+fi
+
 DISK_PATH="/dev/$DISK"
-echo "[+] Disk target : $DISK_PATH"
+echo "[+] Partisi Root : $ROOT_PART"
+echo "[+] Disk target  : $DISK_PATH"
 
 # 4. Download & Ekstrak Image
 echo "[*] Menyiapkan dependensi dan mengunduh image..."
 apt-get update -y > /dev/null 2>&1
-apt-get install -y curl wget unzip > /dev/null 2>&1
+apt-get install -y curl wget unzip fdisk > /dev/null 2>&1
 
 URL="https://download.mikrotik.com/routeros/$VERSION/chr-$VERSION.img.zip"
 if ! wget -qO chr.img.zip "$URL"; then
@@ -66,17 +73,27 @@ echo "[*] Mengekstrak file img..."
 unzip -o chr.img.zip > /dev/null 2>&1
 IMG_FILE="chr-$VERSION.img"
 
-# 5. Mount image via loop device dan injeksi IP (autorun.scr)
-# Menyuntikkan IP ke dalam sistem file CHR agar VPS tidak terputus dari jaringan setelah reboot.
+# 5. Mount image via kalkulasi offset (fdisk)
 echo "[*] Menyuntikkan konfigurasi IP ke dalam image MikroTik..."
-LOOPDEV=$(losetup -f)
-losetup -P $LOOPDEV $IMG_FILE
-
 mkdir -p /mnt/chr
-# CHR memiliki 2 partisi: p1 (boot), p2 (root/ext2 atau ext3)
-if ! mount ${LOOPDEV}p2 /mnt/chr; then
-    echo "[-] Gagal mount partisi image. Pastikan kernel mendukung loop partition."
-    losetup -d $LOOPDEV
+
+# Mencari start sector dari partisi ke-2
+START_SECTOR=$(fdisk -l $IMG_FILE | grep -E "${IMG_FILE}2|img2" | awk '{print $2}')
+if [ "$START_SECTOR" == "*" ]; then
+    START_SECTOR=$(fdisk -l $IMG_FILE | grep -E "${IMG_FILE}2|img2" | awk '{print $3}')
+fi
+
+if [ -z "$START_SECTOR" ] || ! [[ "$START_SECTOR" =~ ^[0-9]+$ ]]; then
+    echo "[-] Gagal mendapatkan offset sector dari image. Keluar."
+    exit 1
+fi
+
+START_BYTE=$((START_SECTOR * 512))
+echo "[+] Offset partisi 2 ditemukan di byte: $START_BYTE"
+
+# Mount image secara langsung menggunakan kalkulasi offset byte
+if ! mount -o loop,offset=$START_BYTE $IMG_FILE /mnt/chr; then
+    echo "[-] Gagal mount partisi image menggunakan offset. Keluar."
     exit 1
 fi
 
@@ -88,7 +105,6 @@ cat <<EOF > /mnt/chr/rw/autorun.scr
 EOF
 
 umount /mnt/chr
-losetup -d $LOOPDEV
 echo "[+] Konfigurasi jaringan berhasil disuntikkan."
 
 # 6. Menulis ke Disk dan Reboot
