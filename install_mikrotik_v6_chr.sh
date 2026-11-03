@@ -73,20 +73,22 @@ echo "[*] Mengekstrak file img..."
 unzip -o chr.img.zip > /dev/null 2>&1
 IMG_FILE="chr-$VERSION.img"
 
-# 5. Mount image via loop device dan injeksi IP (autorun.scr)
+# 5. Mount image via kalkulasi offset (Lebih akurat & stabil)
 echo "[*] Menyuntikkan konfigurasi IP ke dalam image MikroTik..."
-LOOPDEV=$(losetup -f)
-losetup -P $LOOPDEV $IMG_FILE
-
-# Memaksa kernel membaca tabel partisi baru dan memberi jeda
-partprobe $LOOPDEV 2>/dev/null || true
-sleep 2
-
 mkdir -p /mnt/chr
-# CHR memiliki 2 partisi: p1 (boot), p2 (root/ext3)
-if ! mount ${LOOPDEV}p2 /mnt/chr; then
-    echo "[-] Gagal mount partisi image. Pastikan kernel mendukung loop partition."
-    losetup -d $LOOPDEV
+
+# Menghitung offset partisi ke-2 (root/ext3) secara matematis menggunakan parted
+START_BYTE=$(parted -m $IMG_FILE unit B print | grep '^2:' | cut -d ':' -f 2 | tr -d 'B')
+if [ -z "$START_BYTE" ]; then
+    echo "[-] Gagal mendapatkan offset partisi dari image. Keluar."
+    exit 1
+fi
+
+echo "[+] Offset partisi 2 ditemukan di byte: $START_BYTE"
+
+# Mount image secara langsung menggunakan kalkulasi offset byte (tanpa loop0p2)
+if ! mount -o loop,offset=$START_BYTE $IMG_FILE /mnt/chr; then
+    echo "[-] Gagal mount partisi image menggunakan offset. Keluar."
     exit 1
 fi
 
@@ -98,7 +100,6 @@ cat <<EOF > /mnt/chr/rw/autorun.scr
 EOF
 
 umount /mnt/chr
-losetup -d $LOOPDEV
 echo "[+] Konfigurasi jaringan berhasil disuntikkan."
 
 # 6. Menulis ke Disk dan Reboot
