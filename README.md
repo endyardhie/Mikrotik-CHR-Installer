@@ -42,13 +42,13 @@ Jalankan salah satu perintah di bawah ini pada terminal VPS Ubuntu Anda (sesuai 
 ### Instal MikroTik CHR v6 (Stable)
 
 ```bash
-sudo bash -c "$(curl -fsSL https://raw.githubusercontent.com/USERNAME/mikrotik-chr-installer/main/install_mikrotik_v6_chr.sh)"
+sudo bash -c "$(curl -fsSL https://raw.githubusercontent.com/endyardhie/mikrotik-chr-installer/main/install_mikrotik_v6_chr.sh)"
 ```
 
 ### Instal MikroTik CHR v7 (Stable)
 
 ```bash
-sudo bash -c "$(curl -fsSL https://raw.githubusercontent.com/USERNAME/mikrotik-chr-installer/main/install_mikrotik_v7_chr.sh)"
+sudo bash -c "$(curl -fsSL https://raw.githubusercontent.com/endyardhie/mikrotik-chr-installer/main/install_mikrotik_v7_chr.sh)"
 ```
 
 ---
