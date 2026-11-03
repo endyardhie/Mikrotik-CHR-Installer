@@ -1,6 +1,6 @@
 #!/bin/bash
 # Auto-Installer MikroTik CHR v6 untuk Ubuntu Server VPS
-# Mendukung instalasi otomatis, injeksi IP, deteksi netmask, gateway, dan disk cerdas.
+# Mendukung instalasi otomatis, injeksi IP, deteksi netmask, gateway, dan disk cerdas via fdisk offset.
 
 echo "================================================="
 echo "  MikroTik CHR v6 Auto Installer (Ubuntu VPS)    "
@@ -61,7 +61,7 @@ echo "[+] Disk target  : $DISK_PATH"
 # 4. Download & Ekstrak Image
 echo "[*] Menyiapkan dependensi dan mengunduh image..."
 apt-get update -y > /dev/null 2>&1
-apt-get install -y curl wget unzip parted > /dev/null 2>&1
+apt-get install -y curl wget unzip fdisk > /dev/null 2>&1
 
 URL="https://download.mikrotik.com/routeros/$VERSION/chr-$VERSION.img.zip"
 if ! wget -qO chr.img.zip "$URL"; then
@@ -73,20 +73,25 @@ echo "[*] Mengekstrak file img..."
 unzip -o chr.img.zip > /dev/null 2>&1
 IMG_FILE="chr-$VERSION.img"
 
-# 5. Mount image via kalkulasi offset (Lebih akurat & stabil)
+# 5. Mount image via kalkulasi offset (fdisk)
 echo "[*] Menyuntikkan konfigurasi IP ke dalam image MikroTik..."
 mkdir -p /mnt/chr
 
-# Menghitung offset partisi ke-2 (root/ext3) secara matematis menggunakan parted
-START_BYTE=$(parted -m $IMG_FILE unit B print | grep '^2:' | cut -d ':' -f 2 | tr -d 'B')
-if [ -z "$START_BYTE" ]; then
-    echo "[-] Gagal mendapatkan offset partisi dari image. Keluar."
+# Mencari start sector dari partisi ke-2
+START_SECTOR=$(fdisk -l $IMG_FILE | grep -E "${IMG_FILE}2|img2" | awk '{print $2}')
+if [ "$START_SECTOR" == "*" ]; then
+    START_SECTOR=$(fdisk -l $IMG_FILE | grep -E "${IMG_FILE}2|img2" | awk '{print $3}')
+fi
+
+if [ -z "$START_SECTOR" ] || ! [[ "$START_SECTOR" =~ ^[0-9]+$ ]]; then
+    echo "[-] Gagal mendapatkan offset sector dari image. Keluar."
     exit 1
 fi
 
+START_BYTE=$((START_SECTOR * 512))
 echo "[+] Offset partisi 2 ditemukan di byte: $START_BYTE"
 
-# Mount image secara langsung menggunakan kalkulasi offset byte (tanpa loop0p2)
+# Mount image secara langsung menggunakan kalkulasi offset byte
 if ! mount -o loop,offset=$START_BYTE $IMG_FILE /mnt/chr; then
     echo "[-] Gagal mount partisi image menggunakan offset. Keluar."
     exit 1
