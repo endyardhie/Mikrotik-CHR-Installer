@@ -37,8 +37,6 @@ Script ini dirancang untuk berjalan secara fully-automated (tanpa intervensi man
 
 Jalankan salah satu perintah di bawah ini pada terminal VPS Ubuntu Anda (sesuai versi RouterOS yang Anda inginkan). 
 
-> **Catatan**: Ganti `USERNAME` dengan username GitHub Anda sendiri.
-
 ### Instal MikroTik CHR v6 (Stable)
 
 ```bash
